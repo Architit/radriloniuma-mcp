@@ -10,9 +10,10 @@
 5. ✅ Topology: MCPR-01 added to Sovereign Forest
 6. ✅ Memory system: `adal.md` v2.0 + `adal-radriloniuma.md` created
 7. ✅ **Filesystem Server** (`filesystem.py`) — 4 tools, tests
-8. ✅ **Protocols Server** (`protocols.py`) — 4 tools, drift detection (`filesystem.py`) — 4 tools, tests created
+8. ✅ **Protocols Server** (`protocols.py`) — 4 tools, drift detection
+9. ✅ **Executor Server** (`executor.py`) — universal action executor, 11 tests (`protocols.py`) — 4 tools, drift detection (`filesystem.py`) — 4 tools, tests created
 
-## Remaining: 1 Server to Implement
+## COMPLETED — All 5 MCP Servers
 
 ### 1. ✅ Filesystem Server + Edit (`filesystem.py`) — DONE
 **Tools needed:**
@@ -32,7 +33,7 @@
 
 **Key design:** Read-only, scope `data/source/` and `contract/`. Validation against `CONTRACT_SCHEMA_V2.md` if available.
 
-### 3. Executor Server — DO (`executor.py`)
+### 3. ✅ Executor Server (`executor.py`) — DONE
 **Tools needed:**
 - `radr_do` — universal action executor
 
@@ -74,4 +75,4 @@ pytest tests/ -v
 
 ---
 *Paused at: Search server created, awaiting Filesystem+Edit implementation*
-*Next: Executor Server (universal action)*
+*All MCP servers implemented — Wave 5/5 complete*
