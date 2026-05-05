@@ -37,14 +37,19 @@ dev = [
 ]
 
 [project.scripts]
+radriloniuma = "radriloniuma_mcp.__main__:main"
 radriloniuma-gateway = "radriloniuma_mcp.gateway:main"
 radriloniuma-search = "radriloniuma_mcp.search:main"
 radriloniuma-filesystem = "radriloniuma_mcp.filesystem:main"
 radriloniuma-protocols = "radriloniuma_mcp.protocols:main"
+radriloniuma-executor = "radriloniuma_mcp.executor:main"
 radriloniuma-memory = "radriloniuma_mcp.memory:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/radriloniuma_mcp"]
+
+[tool.hatch.build.targets.wheel.sources]
+"src" = ""
 
 [tool.ruff]
 line-length = 100
