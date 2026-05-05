@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """Fix literal backslash-n and escaped triple-quotes in Python files.
 
-When LLM tools write multi-line Python files incorrectly, they may produce:
-- literal backslash-n (two chars: \\ + n) instead of real newlines
-- escaped triple quotes \\"\\"\\" instead of real \"\"\"
+When LLM tools write multi-line Python files incorrectly, they may produce
+literal backslash-n (two chars: \\ + n) instead of real newlines.
 
-This script detects and fixes both issues.
+This script fixes the issue by replacing literal backslash-n that appear
+OUTSIDE of string literals with real newlines. Inside string literals,
+the backslash-n is preserved.
 
 Usage:
-    python3 devkit/fix_python_escapes.py <path_to_python_file>
-    # or: cat file.py | python3 devkit/fix_python_escapes.py --stdin > fixed.py
+    python3 devkit/fix_python_escapes.py <path_to_python_file> [--in-place]
 """
 
 import argparse
@@ -17,30 +17,63 @@ import sys
 from pathlib import Path
 
 
-def fix_python_file(content: str) -> str:
-    """Fix literal backslash-n and escaped triple-quotes in Python source."""
-    original = content
+def fix_python_file(content: str) -> tuple[str, int]:
+    """Replace literal backslash-n outside string literals with real newlines."""
+    result_lines = []
+    changes = 0
     
-    # Fix 1: escaped triple quotes
-    content = content.replace('\\\\\"\"\"', '"""')
+    for line in content.split('\n'):
+        # Track if we are inside a string literal
+        fixed_line = ""
+        i = 0
+        in_string = False
+        string_char = None
+        
+        while i < len(line):
+            ch = line[i]
+            
+            # String start/end
+            if ch in ('"', "'") and not in_string:
+                in_string = True
+                string_char = ch
+                fixed_line += ch
+                i += 1
+                continue
+            
+            if ch == string_char and in_string:
+                # Check for escaped quote (backslash before quote)
+                if i > 0 and line[i-1] == '\\':
+                    fixed_line += ch
+                    i += 1
+                    continue
+                in_string = False
+                string_char = None
+                fixed_line += ch
+                i += 1
+                continue
+            
+            # Inside string: preserve backslash-n as-is
+            if in_string:
+                fixed_line += ch
+                i += 1
+                continue
+            
+            # Outside string: check for literal backslash-n
+            if ch == '\\' and i + 1 < len(line) and line[i+1] == 'n':
+                fixed_line += '\n'
+                changes += 1
+                i += 2
+                continue
+            
+            fixed_line += ch
+            i += 1
+        
+        result_lines.append(fixed_line)
     
-    # Fix 2: literal backslash-n pairs on lines that are NOT just docstring boundaries
-    lines = content.split('\n')
-    fixed_lines = []
-    for line in lines:
-        stripped = line.strip()
-        if stripped == '\\\\\"\"\"':
-            fixed_lines.append('"""')
-        else:
-            fixed_lines.append(line.replace('\\n', '\n'))
-    
-    content = '\n'.join(fixed_lines)
-    
-    changes = sum(1 for a, b in zip(original, content) if a != b)
-    return content, changes
+    return '\n'.join(result_lines), changes
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Fix escaped newlines in Python files")
     parser.add_argument("file", nargs="?", help="Python file to fix")
     parser.add_argument("--stdin", action="store_true", help="Read from stdin")
@@ -59,10 +92,10 @@ def main():
     fixed, changes = fix_python_file(content)
     
     if changes == 0:
-        print("OK: No literal backslash-n or escaped quotes found.")
+        print("OK: No literal backslash-n escapes found.")
         sys.exit(0)
     
-    print(f"FOUND: {changes} literal escapes to fix.")
+    print(f"FOUND: {changes} literal backslash-n escapes to fix.")
     
     if args.check:
         sys.exit(1)
