@@ -1,0 +1,60 @@
+[build-system]
+requires = [\"hatchling\"]
+build-backend = \"hatchling.build\"
+
+[project]
+name = \"radriloniuma-mcp\"
+version = \"0.1.0\"
+description = \"Model Context Protocol servers for the RADRILONIUMA ecosystem\"
+readme = \"README.md\"
+license = { text = \"AGPL-3.0\" }
+requires-python = \">=3.10\"
+authors = [
+    { name = \"RADRILONIUMA Project\", email = \"architect@radriloniuma.local\" }
+]
+keywords = [\"mcp\", \"radriloniuma\", \"gateway\", \"agent\", \"context-protocol\"]
+classifiers = [
+    \"Development Status :: 3 - Alpha\",
+    \"Intended Audience :: Developers\",
+    \"License :: OSI Approved :: GNU Affero General Public License v3\",
+    \"Programming Language :: Python :: 3.10\",
+    \"Programming Language :: Python :: 3.11\",
+    \"Programming Language :: Python :: 3.12\",
+    \"Topic :: Scientific/Engineering :: Artificial Intelligence\",
+]
+
+dependencies = [
+    \"mcp>=1.12.0\",
+    \"pydantic>=2.0.0\",
+]
+
+[project.optional-dependencies]
+dev = [
+    \"pytest>=7.0.0\",
+    \"pytest-asyncio>=0.21.0\",
+    \"ruff>=0.1.0\",
+    \"mypy>=1.5.0\",
+]
+
+[project.scripts]
+radriloniuma-gateway = \"radriloniuma_mcp.gateway:main\"
+radriloniuma-filesystem = \"radriloniuma_mcp.filesystem:main\"
+radriloniuma-protocols = \"radriloniuma_mcp.protocols:main\"
+radriloniuma-memory = \"radriloniuma_mcp.memory:main\"
+
+[tool.hatch.build.targets.wheel]
+packages = [\"src/radriloniuma_mcp\"]
+
+[tool.ruff]
+line-length = 100
+target-version = \"py310\"
+
+[tool.mypy]
+python_version = \"3.10\"
+strict = true
+warn_return_any = true
+warn_unused_ignores = true
+
+[tool.pytest.ini_options]
+asyncio_mode = \"auto\"
+testpaths = [\"tests\"]

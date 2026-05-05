@@ -1,0 +1,1 @@
+\"\"\"RADRILONIUMA MCP Servers — Model Context Protocol for the Sovereign Ecosystem.\"\"\"\n\n__version__ = \"0.1.0\"\n__contract__ = \"mcp_gateway_protocol_v1\"\n
