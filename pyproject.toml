@@ -38,6 +38,7 @@ dev = [
 
 [project.scripts]
 radriloniuma-gateway = "radriloniuma_mcp.gateway:main"
+radriloniuma-search = "radriloniuma_mcp.search:main"
 radriloniuma-filesystem = "radriloniuma_mcp.filesystem:main"
 radriloniuma-protocols = "radriloniuma_mcp.protocols:main"
 radriloniuma-memory = "radriloniuma_mcp.memory:main"
