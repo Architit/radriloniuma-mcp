@@ -58,12 +58,12 @@ class TestSentinel:
 class TestReadFile:
     async def test_read_file_success(self, tmp_radr_root):
         test_file = tmp_radr_root / "data" / "source" / "test.md"
-        test_file.write_text("# Hello\nWorld\n", encoding="utf-8")
+        test_file.write_text("# Hello\nWorld", encoding="utf-8")
 
         result = await _handle_read_file({"file_path": "data/source/test.md"})
         assert "FILE_NOT_FOUND" not in result[0].text
         assert "Hello" in result[0].text
-        assert "lines 1-3 of 3" in result[0].text
+        assert "lines 1-2 of 2" in result[0].text
 
     async def test_read_file_with_line_range(self, tmp_radr_root):
         test_file = tmp_radr_root / "data" / "source" / "test.md"

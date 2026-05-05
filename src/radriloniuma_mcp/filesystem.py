@@ -1,4 +1,4 @@
-\"\"\"RADRILONIUMA MCP Filesystem Server
+"""RADRILONIUMA MCP Filesystem Server
 
 Read/Write/Edit operations with zero-trust scope locking.
 Allowed scopes: .gateway/* and data/local/*
@@ -7,7 +7,7 @@ Contract: mcp_filesystem_protocol
 Version: v1
 Status: ACTIVE
 Mode: contracts-first, derivation-only
-\"\"\"
+"""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ ALLOWED_READ_PREFIXES = (".gateway/", "data/local/", "data/source/", "contract/"
 
 
 def _sentinel_check(operation: str, path: str | None = None, write: bool = False) -> bool:
-    \"\"\"Zero-trust validation for filesystem operations.\"\"\"
+    """Zero-trust validation for filesystem operations."""
     sentinel = os.environ.get("MCP_SENTINEL_GUARD", "ACTIVE")
     if sentinel != "ACTIVE":
         return False
