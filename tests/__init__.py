@@ -1,1 +1,1 @@
-\"\"\"Tests for radriloniuma-mcp.\"\"\"\n
+"""Tests for radriloniuma-mcp."""
