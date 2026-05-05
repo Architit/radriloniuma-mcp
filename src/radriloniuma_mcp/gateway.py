@@ -1,1 +1,299 @@
-\"\"\"RADRILONIUMA MCP Gateway Server\n\nImplements the MCP Gateway Protocol V1 for the RADRILONIUMA ecosystem.\nProvides secure, zero-trust access to:\n  - LRPT/TSPT transit layers\n  - .gateway/* local storage\n  - Canon contracts and protocols\n  - AELARIA chronicles and memory\n\nContract: mcp_gateway_protocol\nVersion: v1\nStatus: ACTIVE\nMode: contracts-first, derivation-only\n\"\"\"\n\nfrom __future__ import annotations\n\nimport asyncio\nimport json\nimport os\nfrom pathlib import Path\nfrom typing import Any\n\nfrom mcp.server import Server\nfrom mcp.server.stdio import stdio_server\nfrom mcp.types import (\n    CallToolRequestParams,\n    ListToolsRequestParams,\n    TextContent,\n    Tool,\n)\n\n# ---------------------------------------------------------------------------\n# Configuration\n# ---------------------------------------------------------------------------\nRADRILONIUMA_ROOT = Path(os.environ.get(\"RADRILONIUMA_ROOT\", \"/root/Architit_Nodes/RADRILONIUMA\"))\nTRUST_CLASS = os.environ.get(\"MCP_TRUST_CLASS\", \"TRUSTED_INTERNAL\")\nSENTINEL_GUARD = os.environ.get(\"MCP_SENTINEL_GUARD\", \"ACTIVE\")\n\n# ---------------------------------------------------------------------------\n# Validation Gate\n# ---------------------------------------------------------------------------\n\ndef _sentinel_check(endpoint_id: str, operation: str, path: str | None = None) -> bool:\n    \"\"\"Zero-trust validation before any TSPT ingress.\"\"\"\n    if SENTINEL_GUARD != \"ACTIVE\":\n        return False\n    if TRUST_CLASS not in (\"TRUSTED_INTERNAL\", \"TRUSTED_EXTERNAL\"):\n        return False\n    # Block any path outside RADRILONIUMA_ROOT\n    if path is not None:\n        resolved = (RADRILONIUMA_ROOT / path).resolve()\n        if not str(resolved).startswith(str(RADRILONIUMA_ROOT.resolve())):\n            return False\n    return True\n\n# ---------------------------------------------------------------------------\n# Tool Registry\n# ---------------------------------------------------------------------------\n\nTOOLS: list[Tool] = [\n    Tool(\n        name=\"radr_list_directory\",\n        description=\"List contents of a directory within the RADRILONIUMA repository. \"\n                    \"Requires Sentinel approval. Returns file tree with metadata.\",\n        inputSchema={\n            \"type\": \"object\",\n            \"properties\": {\n                \"relative_path\": {\n                    \"type\": \"string\",\n                    \"description\": \"Path relative to RADRILONIUMA_ROOT\",\n                },\n                \"max_depth\": {\n                    \"type\": \"integer\",\n                    \"description\": \"Maximum recursion depth\",\n                    \"default\": 2,\n                },\n            },\n            \"required\": [\"relative_path\"],\n        },\n    ),\n    Tool(\n        name=\"radr_read_contract\",\n        description=\"Read a contract or protocol file from RADRILONIUMA. \"\n                    \"Zero-trust: only .md and .yaml files in data/source/ or contract/.\",\n        inputSchema={\n            \"type\": \"object\",\n            \"properties\": {\n                \"contract_path\": {\n                    \"type\": \"string\",\n                    \"description\": \"Relative path to contract file (e.g. 'data/source/protocols/MCP_GATEWAY_PROTOCOL_V1.md')\",\n                },\n            },\n            \"required\": [\"contract_path\"],\n        },\n    ),\n    Tool(\n        name=\"radr_search_canon\",\n        description=\"Search for keywords across canon, protocols, and contracts.\",\n        inputSchema={\n            \"type\": \"object\",\n            \"properties\": {\n                \"query\": {\n                    \"type\": \"string\",\n                    \"description\": \"Search term or regex pattern\",\n                },\n                \"scope\": {\n                    \"type\": \"string\",\n                    \"enum\": [\"protocols\", \"contracts\", \"canon\", \"all\"],\n                    \"default\": \"all\",\n                },\n                \"max_results\": {\n                    \"type\": \"integer\",\n                    \"default\": 10,\n                },\n            },\n            \"required\": [\"query\"],\n        },\n    ),\n    Tool(\n        name=\"radr_get_endpoint_status\",\n        description=\"Return the MCP Endpoint Matrix status for RADRILONIUMA.\",\n        inputSchema={\n            \"type\": \"object\",\n            \"properties\": {},\n        },\n    ),\n]\n\n# ---------------------------------------------------------------------------\n# Tool Handlers\n# ---------------------------------------------------------------------------\n\nasync def _handle_list_directory(args: dict[str, Any]) -> list[TextContent]:\n    rel_path = args[\"relative_path\"]\n    max_depth = args.get(\"max_depth\", 2)\n\n    if not _sentinel_check(\"mcp_local_gateway\", \"read\", rel_path):\n        return [TextContent(type=\"text\", text=\"SENTINEL_REJECT: Access denied by zero-trust guard.\")]\n\n    target = (RADRILONIUMA_ROOT / rel_path).resolve()\n    if not target.exists():\n        return [TextContent(type=\"text\", text=f\"PATH_NOT_FOUND: {rel_path}\")]\n\n    entries: list[dict[str, Any]] = []\n    for item in target.rglob(\"*\"):\n        depth = len(item.relative_to(target).parts)\n        if depth > max_depth:\n            continue\n        entries.append({\n            \"path\": str(item.relative_to(RADRILONIUMA_ROOT)),\n            \"type\": \"directory\" if item.is_dir() else \"file\",\n            \"size\": item.stat().st_size if item.is_file() else None,\n        })\n\n    entries.sort(key=lambda x: (x[\"type\"] != \"directory\", x[\"path\"]))\n    return [TextContent(type=\"text\", text=json.dumps(entries, indent=2, ensure_ascii=False))]\n\n\nasync def _handle_read_contract(args: dict[str, Any]) -> list[TextContent]:\n    contract_path = args[\"contract_path\"]\n\n    if not _sentinel_check(\"mcp_local_gateway\", \"read\", contract_path):\n        return [TextContent(type=\"text\", text=\"SENTINEL_REJECT: Access denied by zero-trust guard.\")]\n\n    # Only allow .md and .yaml in specific directories\n    allowed_prefixes = (\"data/source/\", \"contract/\", \"protocol/\")\n    if not any(contract_path.startswith(p) for p in allowed_prefixes):\n        return [TextContent(type=\"text\", text=\"POLICY_REJECT: Path outside allowed contract scopes.\")]\n\n    if not (contract_path.endswith(\".md\") or contract_path.endswith(\".yaml\") or contract_path.endswith(\".yml\")):\n        return [TextContent(type=\"text\", text=\"POLICY_REJECT: Only markdown and YAML contracts are readable.\")]\n\n    target = (RADRILONIUMA_ROOT / contract_path).resolve()\n    if not target.exists():\n        return [TextContent(type=\"text\", text=f\"CONTRACT_NOT_FOUND: {contract_path}\")]\n\n    content = target.read_text(encoding=\"utf-8\")\n    return [TextContent(type=\"text\", text=f\"--- CONTRACT: {contract_path} ---\\n\\n{content}\")]\n\n\nasync def _handle_search_canon(args: dict[str, Any]) -> list[TextContent]:\n    import re\n\n    query = args[\"query\"]\n    scope = args.get(\"scope\", \"all\")\n    max_results = args.get(\"max_results\", 10)\n\n    if not _sentinel_check(\"mcp_local_gateway\", \"read\"):\n        return [TextContent(type=\"text\", text=\"SENTINEL_REJECT: Access denied by zero-trust guard.\")]\n\n    scope_dirs: list[Path] = []\n    if scope in (\"protocols\", \"all\"):\n        scope_dirs.append(RADRILONIUMA_ROOT / \"data\" / \"source\" / \"protocols\")\n    if scope in (\"contracts\", \"all\"):\n        scope_dirs.append(RADRILONIUMA_ROOT / \"contract\")\n    if scope in (\"canon\", \"all\"):\n        scope_dirs.append(RADRILONIUMA_ROOT / \"data\" / \"source\" / \"canon\")\n\n    results: list[dict[str, Any]] = []\n    pattern = re.compile(query, re.IGNORECASE)\n\n    for directory in scope_dirs:\n        if not directory.exists():\n            continue\n        for file_path in directory.rglob(\"*\"):\n            if not file_path.is_file():\n                continue\n            try:\n                text = file_path.read_text(encoding=\"utf-8\")\n                matches = list(pattern.finditer(text))\n                if matches:\n                    results.append({\n                        \"file\": str(file_path.relative_to(RADRILONIUMA_ROOT)),\n                        \"matches\": len(matches),\n                        \"preview\": text[max(0, matches[0].start() - 80):matches[0].end() + 80],\n                    })\n                    if len(results) >= max_results:\n                        break\n            except Exception:\n                continue\n        if len(results) >= max_results:\n            break\n\n    return [TextContent(type=\"text\", text=json.dumps(results, indent=2, ensure_ascii=False))]\n\n\nasync def _handle_get_endpoint_status(_args: dict[str, Any]) -> list[TextContent]:\n    matrix = {\n        \"effective_utc\": \"2026-05-05T00:00:00Z\",\n        \"endpoints\": [\n            {\n                \"endpoint_id\": \"mcp_local_gateway\",\n                \"backend\": \"local_fs\",\n                \"trust_class\": TRUST_CLASS,\n                \"scope\": \"LRPT/TSPT + .gateway/*\",\n                \"direction\": \"read_write\",\n                \"status\": \"ACTIVE\" if SENTINEL_GUARD == \"ACTIVE\" else \"DEGRADED\",\n            },\n            {\n                \"endpoint_id\": \"mcp_onedrive_bridge\",\n                \"backend\": \"onedrive\",\n                \"trust_class\": \"TRUSTED_EXTERNAL\",\n                \"scope\": \"contracts/taskspec/patch artifacts\",\n                \"direction\": \"read_write\",\n                \"status\": \"CONDITIONAL\",\n            },\n            {\n                \"endpoint_id\": \"mcp_gdrive_lake\",\n                \"backend\": \"gdrive\",\n                \"trust_class\": \"TRUSTED_EXTERNAL\",\n                \"scope\": \"journals/log snapshots/research context\",\n                \"direction\": \"read_only\",\n                \"status\": \"CONDITIONAL\",\n            },\n        ],\n        \"sentinel_guard\": SENTINEL_GUARD,\n    }\n    return [TextContent(type=\"text\", text=json.dumps(matrix, indent=2, ensure_ascii=False))]\n\n\nHANDLERS = {\n    \"radr_list_directory\": _handle_list_directory,\n    \"radr_read_contract\": _handle_read_contract,\n    \"radr_search_canon\": _handle_search_canon,\n    \"radr_get_endpoint_status\": _handle_get_endpoint_status,\n}\n\n# ---------------------------------------------------------------------------\n# Server Lifecycle\n# ---------------------------------------------------------------------------\n\nasync def run_server() -> None:\n    server = Server(\"radriloniuma-gateway\")\n\n    @server.list_tools()\n    async def list_tools(_request: ListToolsRequestParams) -> list[Tool]:\n        return TOOLS\n\n    @server.call_tool()\n    async def call_tool(name: str, arguments: dict[str, Any] | None) -> list[TextContent]:\n        if name not in HANDLERS:\n            return [TextContent(type=\"text\", text=f\"UNKNOWN_TOOL: {name}\")]\n        args = arguments or {}\n        return await HANDLERS[name](args)\n\n    async with stdio_server(server) as (read_stream, write_stream):\n        await server.run(read_stream, write_stream, server.create_initialization_options())\n\n\ndef main() -> None:\n    asyncio.run(run_server())\n\n\nif __name__ == \"__main__\":\n    main()\n
+"""RADRILONIUMA MCP Gateway Server
+
+Implements the MCP Gateway Protocol V1 for the RADRILONIUMA ecosystem.
+Provides secure, zero-trust access to:
+  - LRPT/TSPT transit layers
+  - .gateway/* local storage
+  - Canon contracts and protocols
+  - AELARIA chronicles and memory
+
+Contract: mcp_gateway_protocol
+Version: v1
+Status: ACTIVE
+Mode: contracts-first, derivation-only
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import os
+from pathlib import Path
+from typing import Any
+
+from mcp.server import Server
+from mcp.server.stdio import stdio_server
+from mcp.types import (
+    TextContent,
+    Tool,
+)
+
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+RADRILONIUMA_ROOT = Path(os.environ.get("RADRILONIUMA_ROOT", "/root/Architit_Nodes/RADRILONIUMA"))
+TRUST_CLASS = os.environ.get("MCP_TRUST_CLASS", "TRUSTED_INTERNAL")
+SENTINEL_GUARD = os.environ.get("MCP_SENTINEL_GUARD", "ACTIVE")
+
+# ---------------------------------------------------------------------------
+# Validation Gate
+# ---------------------------------------------------------------------------
+
+def _sentinel_check(endpoint_id: str, operation: str, path: str | None = None) -> bool:
+    """Zero-trust validation before any TSPT ingress.
+
+    Reads env vars on every call to support testing and dynamic policy updates.
+    """
+    sentinel = os.environ.get("MCP_SENTINEL_GUARD", "ACTIVE")
+    trust = os.environ.get("MCP_TRUST_CLASS", "TRUSTED_INTERNAL")
+    if sentinel != "ACTIVE":
+        return False
+    if trust not in ("TRUSTED_INTERNAL", "TRUSTED_EXTERNAL"):
+        return False
+    # Block any path outside RADRILONIUMA_ROOT
+    if path is not None:
+        resolved = (RADRILONIUMA_ROOT / path).resolve()
+        if not str(resolved).startswith(str(RADRILONIUMA_ROOT.resolve())):
+            return False
+    return True
+
+# ---------------------------------------------------------------------------
+# Tool Registry
+# ---------------------------------------------------------------------------
+
+TOOLS: list[Tool] = [
+    Tool(
+        name="radr_list_directory",
+        description="List contents of a directory within the RADRILONIUMA repository. "
+                    "Requires Sentinel approval. Returns file tree with metadata.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "relative_path": {
+                    "type": "string",
+                    "description": "Path relative to RADRILONIUMA_ROOT",
+                },
+                "max_depth": {
+                    "type": "integer",
+                    "description": "Maximum recursion depth",
+                    "default": 2,
+                },
+            },
+            "required": ["relative_path"],
+        },
+    ),
+    Tool(
+        name="radr_read_contract",
+        description="Read a contract or protocol file from RADRILONIUMA. "
+                    "Zero-trust: only .md and .yaml files in data/source/ or contract/.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "contract_path": {
+                    "type": "string",
+                    "description": "Relative path to contract file",
+                },
+            },
+            "required": ["contract_path"],
+        },
+    ),
+    Tool(
+        name="radr_search_canon",
+        description="Search for keywords across canon, protocols, and contracts.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Search term or regex pattern",
+                },
+                "scope": {
+                    "type": "string",
+                    "enum": ["protocols", "contracts", "canon", "all"],
+                    "default": "all",
+                },
+                "max_results": {
+                    "type": "integer",
+                    "default": 10,
+                },
+            },
+            "required": ["query"],
+        },
+    ),
+    Tool(
+        name="radr_get_endpoint_status",
+        description="Return the MCP Endpoint Matrix status for RADRILONIUMA.",
+        inputSchema={
+            "type": "object",
+            "properties": {},
+        },
+    ),
+]
+
+# ---------------------------------------------------------------------------
+# Tool Handlers
+# ---------------------------------------------------------------------------
+
+async def _handle_list_directory(args: dict[str, Any]) -> list[TextContent]:
+    rel_path = args["relative_path"]
+    max_depth = args.get("max_depth", 2)
+
+    if not _sentinel_check("mcp_local_gateway", "read", rel_path):
+        return [TextContent(type="text", text="SENTINEL_REJECT: Access denied by zero-trust guard.")]
+
+    target = (RADRILONIUMA_ROOT / rel_path).resolve()
+    if not target.exists():
+        return [TextContent(type="text", text=f"PATH_NOT_FOUND: {rel_path}")]
+
+    entries: list[dict[str, Any]] = []
+    for item in target.rglob("*"):
+        depth = len(item.relative_to(target).parts)
+        if depth > max_depth:
+            continue
+        entries.append({
+            "path": str(item.relative_to(RADRILONIUMA_ROOT)),
+            "type": "directory" if item.is_dir() else "file",
+            "size": item.stat().st_size if item.is_file() else None,
+        })
+
+    entries.sort(key=lambda x: (x["type"] != "directory", x["path"]))
+    return [TextContent(type="text", text=json.dumps(entries, indent=2, ensure_ascii=False))]
+
+
+async def _handle_read_contract(args: dict[str, Any]) -> list[TextContent]:
+    contract_path = args["contract_path"]
+
+    if not _sentinel_check("mcp_local_gateway", "read", contract_path):
+        return [TextContent(type="text", text="SENTINEL_REJECT: Access denied by zero-trust guard.")]
+
+    # Only allow .md and .yaml in specific directories
+    allowed_prefixes = ("data/source/", "contract/", "protocol/")
+    if not any(contract_path.startswith(p) for p in allowed_prefixes):
+        return [TextContent(type="text", text="POLICY_REJECT: Path outside allowed contract scopes.")]
+
+    if not (contract_path.endswith(".md") or contract_path.endswith(".yaml") or contract_path.endswith(".yml")):
+        return [TextContent(type="text", text="POLICY_REJECT: Only markdown and YAML contracts are readable.")]
+
+    target = (RADRILONIUMA_ROOT / contract_path).resolve()
+    if not target.exists():
+        return [TextContent(type="text", text=f"CONTRACT_NOT_FOUND: {contract_path}")]
+
+    content = target.read_text(encoding="utf-8")
+    return [TextContent(type="text", text=f"--- CONTRACT: {contract_path} ---\n\n{content}")]
+
+
+async def _handle_search_canon(args: dict[str, Any]) -> list[TextContent]:
+    import re
+
+    query = args["query"]
+    scope = args.get("scope", "all")
+    max_results = args.get("max_results", 10)
+
+    if not _sentinel_check("mcp_local_gateway", "read"):
+        return [TextContent(type="text", text="SENTINEL_REJECT: Access denied by zero-trust guard.")]
+
+    scope_dirs: list[Path] = []
+    if scope in ("protocols", "all"):
+        scope_dirs.append(RADRILONIUMA_ROOT / "data" / "source" / "protocols")
+    if scope in ("contracts", "all"):
+        scope_dirs.append(RADRILONIUMA_ROOT / "contract")
+    if scope in ("canon", "all"):
+        scope_dirs.append(RADRILONIUMA_ROOT / "data" / "source" / "canon")
+
+    results: list[dict[str, Any]] = []
+    pattern = re.compile(query, re.IGNORECASE)
+
+    for directory in scope_dirs:
+        if not directory.exists():
+            continue
+        for file_path in directory.rglob("*"):
+            if not file_path.is_file():
+                continue
+            try:
+                text = file_path.read_text(encoding="utf-8")
+                matches = list(pattern.finditer(text))
+                if matches:
+                    results.append({
+                        "file": str(file_path.relative_to(RADRILONIUMA_ROOT)),
+                        "matches": len(matches),
+                        "preview": text[max(0, matches[0].start() - 80):matches[0].end() + 80],
+                    })
+                    if len(results) >= max_results:
+                        break
+            except Exception:
+                continue
+        if len(results) >= max_results:
+            break
+
+    return [TextContent(type="text", text=json.dumps(results, indent=2, ensure_ascii=False))]
+
+
+async def _handle_get_endpoint_status(_args: dict[str, Any]) -> list[TextContent]:
+    matrix = {
+        "effective_utc": "2026-05-05T00:00:00Z",
+        "endpoints": [
+            {
+                "endpoint_id": "mcp_local_gateway",
+                "backend": "local_fs",
+                "trust_class": TRUST_CLASS,
+                "scope": "LRPT/TSPT + .gateway/*",
+                "direction": "read_write",
+                "status": "ACTIVE" if SENTINEL_GUARD == "ACTIVE" else "DEGRADED",
+            },
+            {
+                "endpoint_id": "mcp_onedrive_bridge",
+                "backend": "onedrive",
+                "trust_class": "TRUSTED_EXTERNAL",
+                "scope": "contracts/taskspec/patch artifacts",
+                "direction": "read_write",
+                "status": "CONDITIONAL",
+            },
+            {
+                "endpoint_id": "mcp_gdrive_lake",
+                "backend": "gdrive",
+                "trust_class": "TRUSTED_EXTERNAL",
+                "scope": "journals/log snapshots/research context",
+                "direction": "read_only",
+                "status": "CONDITIONAL",
+            },
+        ],
+        "sentinel_guard": SENTINEL_GUARD,
+    }
+    return [TextContent(type="text", text=json.dumps(matrix, indent=2, ensure_ascii=False))]
+
+
+HANDLERS = {
+    "radr_list_directory": _handle_list_directory,
+    "radr_read_contract": _handle_read_contract,
+    "radr_search_canon": _handle_search_canon,
+    "radr_get_endpoint_status": _handle_get_endpoint_status,
+}
+
+# ---------------------------------------------------------------------------
+# Server Lifecycle
+# ---------------------------------------------------------------------------
+
+async def run_server() -> None:
+    server = Server("radriloniuma-gateway")
+
+    @server.list_tools()
+    async def list_tools() -> list[Tool]:
+        return TOOLS
+
+    @server.call_tool()
+    async def call_tool(name: str, arguments: dict[str, Any] | None) -> list[TextContent]:
+        if name not in HANDLERS:
+            return [TextContent(type="text", text=f"UNKNOWN_TOOL: {name}")]
+        args = arguments or {}
+        return await HANDLERS[name](args)
+
+    async with stdio_server(server) as (read_stream, write_stream):
+        await server.run(read_stream, write_stream, server.create_initialization_options())
+
+
+def main() -> None:
+    asyncio.run(run_server())
+
+
+if __name__ == "__main__":
+    main()
