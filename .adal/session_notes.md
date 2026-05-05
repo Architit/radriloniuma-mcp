@@ -9,9 +9,10 @@
 4. ✅ ASR registered: `ASR_RADRILONIUMA_MCP_BIRTH_2026-05-05`
 5. ✅ Topology: MCPR-01 added to Sovereign Forest
 6. ✅ Memory system: `adal.md` v2.0 + `adal-radriloniuma.md` created
-7. ✅ **Filesystem Server** (`filesystem.py`) — 4 tools, tests created
+7. ✅ **Filesystem Server** (`filesystem.py`) — 4 tools, tests
+8. ✅ **Protocols Server** (`protocols.py`) — 4 tools, drift detection (`filesystem.py`) — 4 tools, tests created
 
-## Remaining: 2 Servers to Implement
+## Remaining: 1 Server to Implement
 
 ### 1. ✅ Filesystem Server + Edit (`filesystem.py`) — DONE
 **Tools needed:**
@@ -22,7 +23,7 @@
 
 **Key design:** Edit modes = `replace` (old_string→new_string), `insert` (after anchor), `delete` (line_range). Scope locked to `.gateway/*` and `data/local/`.
 
-### 2. Protocols Server (`protocols.py`)
+### 2. ✅ Protocols Server (`protocols.py`) — DONE
 **Tools needed:**
 - `radr_validate_contract` — YAML/MD schema validation
 - `radr_list_protocols` — list with status filter
@@ -73,4 +74,4 @@ pytest tests/ -v
 
 ---
 *Paused at: Search server created, awaiting Filesystem+Edit implementation*
-*Next: Protocols Server (validation/list/drift)*
+*Next: Executor Server (universal action)*
