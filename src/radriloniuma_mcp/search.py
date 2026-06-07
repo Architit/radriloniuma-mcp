@@ -1,3 +1,4 @@
+# Copyright (c) 2026-06-07 RADRILONIUMA / TRIANIUMA Kingdom. All rights reserved.
 """RADRILONIUMA MCP Search Server
 
 Advanced ecosystem search with filters:

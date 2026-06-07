@@ -1,3 +1,4 @@
+# Copyright (c) 2026-06-07 RADRILONIUMA / TRIANIUMA Kingdom. All rights reserved.
 """RADRILONIUMA MCP Filesystem Server
 
 Read/Write/Edit operations with zero-trust scope locking.

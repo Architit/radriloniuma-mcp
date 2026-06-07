@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026-06-07 RADRILONIUMA / TRIANIUMA Kingdom. All rights reserved.
 """Fix literal backslash-n and escaped triple-quotes in Python files.
 
 When LLM tools write multi-line Python files incorrectly, they may produce

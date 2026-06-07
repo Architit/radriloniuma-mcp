@@ -1,3 +1,4 @@
+# Copyright (c) 2026-06-07 RADRILONIUMA / TRIANIUMA Kingdom. All rights reserved.
 """RADRILONIUMA MCP Gateway Server
 
 Implements the MCP Gateway Protocol V1 for the RADRILONIUMA ecosystem.

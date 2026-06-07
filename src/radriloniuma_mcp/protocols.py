@@ -1,3 +1,4 @@
+# Copyright (c) 2026-06-07 RADRILONIUMA / TRIANIUMA Kingdom. All rights reserved.
 """RADRILONIUMA MCP Protocols Server
 
 Read-only protocol and contract validation.
