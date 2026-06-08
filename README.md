@@ -1,1 +1,25 @@
-# RADRILONIUMA MCP ⚜️\n\n> Model Context Protocol servers for the Sovereign RADRILONIUMA Ecosystem\n\n```\nContract: mcp_gateway_protocol\nVersion:    v1\nStatus:     ACTIVE\nMode:       contracts-first, derivation-only\n```\n\n## Overview\n\nThis repository implements MCP (Model Context Protocol) servers that bridge external LLM reasoning capabilities with the internal RADRILONIUMA workflow — safely, with zero-trust validation and Sentinel guard at every ingress.\n\n## Architecture\n\n```\n┌─────────────────┐     MCP (stdio/SSE)      ┌──────────────────────┐\n│   LLM Client    │  ═══════════════════════► │  radriloniuma-mcp    │\n│  (Claude/Cursor)│                          │  ├─ gateway          │\n│                 │ ◄════════════════════════ │  ├─ filesystem       │\n└─────────────────┘     Tool Results         │  ├─ protocols        │\n                                             │  └─ memory           │\n                                             └──────────────────────┘\n                                                        │\n                                               Zero-Trust Sentinel\n                                                        │\n                                             ┌──────────────────────┐\n                                             │  RADRILONIUMA_ROOT   │\n                                             │  ├─ data/source/     │\n                                             │  ├─ contract/        │\n                                             │  ├─ chronolog/       │\n                                             │  └─ .gateway/        │\n                                             └──────────────────────┘\n```\n\n## Servers\n\n| Server | CLI Entrypoint | Purpose | Status |\n|--------|---------------|---------|--------|\n| **Gateway** | `radriloniuma-gateway` | LRPT/TSPT access, contracts, endpoint matrix | ✅ Implemented |\n| **Filesystem** | `radriloniuma-filesystem` | Secure `.gateway/*` file operations | 🔄 Planned |\n| **Protocols** | `radriloniuma-protocols` | Canon search, protocol validation | 🔄 Planned |\n| **Memory** | `radriloniuma-memory` | AELARIA chronicles, knowledge graph | 🔄 Planned |\n\n## Installation\n\n```bash\n# Clone\ncd /root/Architit_Nodes/radriloniuma-mcp\n\n# Create venv\npython -m venv .venv\nsource .venv/bin/activate\n\n# Install in editable mode with dev deps\npip install -e \".[dev]\"\n```\n\n## Usage\n\n### As MCP Server (stdio)\n\n```json\n{\n  \"mcpServers\": {\n    \"radriloniuma\": {\n      \"command\": \"python\",\n      \"args\": [\"-m\", \"radriloniuma_mcp.gateway\"],\n      \"env\": {\n        \"RADRILONIUMA_ROOT\": \"/root/Architit_Nodes/RADRILONIUMA\",\n        \"MCP_TRUST_CLASS\": \"TRUSTED_INTERNAL\",\n        \"MCP_SENTINEL_GUARD\": \"ACTIVE\"\n      }\n    }\n  }\n}\n```\n\n### Direct Execution\n\n```bash\n# Run gateway server\nradriloniuma-gateway\n\n# Or via module\npython -m radriloniuma_mcp.gateway\n```\n\n## Security Model\n\n1. **Network**: Local binding only (stdio transport)\n2. **Authentication**: Environment-based trust class\n3. **Authorization**: Path scope validation against `RADRILONIUMA_ROOT`\n4. **Validation**: Input schema enforcement via Pydantic\n5. **Monitoring**: Every call logged through structured output\n\n## Development\n\n```bash\n# Lint\nruff check src/\n\n# Type check\nmypy src/\n\n# Test\npytest tests/ -v\n```\n\n## License\n\nAGPL-3.0 — see [LICENSE](LICENSE).\n\n---\n\n*А́мієно́а́э́с моєа́э́ри́э́с ⚜️*\n
+# ⚠️ DECOMMISSIONED / ARCHIVED ⚜️
+
+> [!WARNING]
+> This repository (`radriloniuma-mcp`) has been formally decommissioned and is no longer active.
+> Refer to [RADRILONIUMA](file:///home/architit/LAM_CORE/RADRILONIUMA) for active Model Context Protocol (MCP) and control plane functionality.
+
+---
+
+# RADRILONIUMA MCP ⚜️
+
+> Model Context Protocol servers for the Sovereign RADRILONIUMA Ecosystem
+
+```
+Contract: mcp_gateway_protocol
+Version:    v1
+Status:     DECOMMISSIONED (INACTIVE)
+Mode:       contracts-first, derivation-only
+```
+
+## Overview
+
+This repository implemented MCP (Model Context Protocol) servers that bridged external LLM reasoning capabilities with the internal RADRILONIUMA workflow. It has been archived in favor of unified substrates.
+
+---
+*А́мієно́а́э́с моєа́э́ри́э́с ⚜️*
